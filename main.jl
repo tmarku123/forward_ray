@@ -1,37 +1,35 @@
-include("functions.jl")
+include("functions.jl");
 
-filename = "seabed.png"
-domain = initialise_domain(filename)
+filename = "seabed.png";
+domain   = initialise_domain(filename;plot=false);
 
-x_grad = 0
-z_grad = 1
-base_velocity = 10
+dvdx          = 0;
+dvdz          = 0.01;
+base_velocity = 1.4;        
 
-velocity_grads =    Velocity_Gradients(x_grad,z_grad,base_velocity)
-domain_fields =     initialise_fields(domain,velocity_grads)
+velocity_grads = VelocityGradients(dvdx,dvdz,base_velocity);
+fields         = initialise_fields(domain,velocity_grads;plot=false);
 
-ds = 0.5
-s_max = 1500
-x_init = 750
-z_init = 450
-amp_init = 1
-no_rays = 360
-theta_init = collect(range(0,(360-360/no_rays),no_rays)) 
+t_max       = 250;
+no_rays     = 10;
+angle_range = [0 , 360];
+params      = initialise_parameters(t_max,no_rays,angle_range,fields);
 
-rays = Vector{Ray}()
-for theta in theta_init
-    parameters = (
-        x_init,
-        z_init,
-        amp_init,
-        theta,
-        ds,
-        s_max
-    )
-    init_conditions = Initial_Conditions(parameters...)
-    ray = trace_ray(domain,domain_fields,init_conditions)
-    push!(rays, ray)
+x_0       = domain.x_dims/2;  
+z_0       = 400;
+position  = [x_0 , z_0];
+amp_0     = 1;
+theta     = params.angles[1];
+u_initial = interpolate_field(fields.slowness_field,x_0,z_0);
+
+source_rays = Vector{Ray}(undef, size(params.angles,1));
+source_data = Vector{RayData}(undef, size(params.angles,1))
+no_samples  = 1000
+
+for (i,theta) in enumerate(params.angles)
+    ICs      = InitialConditions(position,amp_0,theta,u_initial)
+    ray_data = initialise_ray_data(params,no_samples)
+    source_rays[i],source_data[i] = calculate_ray(ICs,domain,params,fields,ray_data)
 end
 
-plot_ray(domain,rays)
-
+plot_ray(domain,source_data)
